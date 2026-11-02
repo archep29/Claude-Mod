@@ -1,0 +1,1 @@
+{ "name": "mod-prompt-toc", "version": "0.1.0", "description": "내가 적은 질문만 모아 목차로 보여주고, 누르면 그 질문으로 이동", "types": "./types/index.d.ts" }

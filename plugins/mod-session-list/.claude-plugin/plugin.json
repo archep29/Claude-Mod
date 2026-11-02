@@ -1,0 +1,1 @@
+{ "name": "mod-session-list", "version": "0.1.0", "description": "최근 30일 세션을 프로젝트별로 보여주고 새 탭에서 여는 패널", "types": "./types/index.d.ts" }
