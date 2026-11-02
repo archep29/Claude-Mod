@@ -7,6 +7,20 @@ Claude Code 터미널에 붙여 쓰는 모드 2개입니다.
 | `mod-session-list` | 최근 30일 세션을 프로젝트별로 보여 주는 패널. 누르면 새 탭에서 그 세션을 엽니다. | `/mod-session-list` |
 | `mod-prompt-toc` | 이 대화에서 내가 적은 질문만 모아 목차로 보여 줍니다. 누르면 그 질문으로 이동합니다. | `/mod-prompt-toc` |
 
+## 어떻게 쓰나요
+
+아래 그림은 쓰는 법을 보여 주는 예시 화면입니다. 내용은 지어낸 것입니다.
+
+### 세션 목록 (`mod-session-list`)
+
+![세션 목록 패널 예시](docs/session-list.png)
+
+![최소화했을 때 예시](docs/session-list-minimized.png)
+
+### 내 질문 목차 (`mod-prompt-toc`)
+
+![내 질문 목차 예시](docs/prompt-toc.png)
+
 ## 설치
 
 Claude Code 입력창에서:
