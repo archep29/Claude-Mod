@@ -48,6 +48,18 @@ claude plugin install mod-prompt-toc --marketplace archep29/Claude-Mod
 
 데스크톱 앱에서는 입력창 옆 + → Plugins → Add marketplace에 `archep29/Claude-Mod`를 넣고 Add plugin을 누릅니다.
 
+## 설치 후 켜고 끄기
+
+설치하면 Claude Code를 새로 켤 때 패널이 저절로 열립니다(터미널 창이 넓을 때). 입력창에 `/` 명령을 쳐서 켜고 끕니다.
+
+| 모드 | 켜기 | 끄기 |
+|---|---|---|
+| 세션 목록 | `/mod-session-list` | `/mod-session-list` 한 번 더, 또는 「_ 최소화」 |
+| 내 질문 목차 | `/mod-prompt-toc` | 패널 오른쪽 위 `×`, 또는 Ctrl+X 다음 X |
+
+- 세션 목록을 「_ 최소화」로 접으면 입력창 위 「▸ 세션 목록」 한 줄만 남고, 그 줄을 누르면 다시 열립니다.
+- 모드 자체를 아예 쓰지 않으려면 `/plugin`에서 끄거나 지웁니다.
+
 ## mod-session-list 필요 조건
 
 - Windows, Windows 터미널(`wt`)
