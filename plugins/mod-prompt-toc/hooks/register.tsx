@@ -61,6 +61,11 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'mod-prompt-toc' }, async $ => {
+    // 열려 있으면 닫고, 닫혀 있으면 연다.
+    if ((await $.ui.panes()).some(pane => pane.id === PANE)) {
+      await $.ui.close({ id: PANE })
+      return { text: '질문 목차 창을 닫았습니다.' }
+    }
     await $.ui.open({ id: PANE, title: TITLE })
     return { text: '질문 목차 창을 열었습니다.' }
   })
