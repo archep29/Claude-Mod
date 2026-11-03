@@ -5,11 +5,13 @@ import type { Prefs, ScanResult, SessionRow } from '../types'
 
 // 최근 30일 세션을 프로젝트(작업 폴더)별로 묶어 최근 대화가 위로 오게 보여주고, 누르면 새 탭에서 연다.
 // /mod-session-list로 열고 닫는다. 「_ 최소화」를 누르면 패널을 닫고 입력창 위에 다시 여는 한 줄만 남긴다.
-// ▲▼로 순서를 옮기고 ✎로 이름을 바꾼다. 순서는 $.store에, 이름은 scan_sessions.py가 따로 파일에 남긴다(대화 기록은 건드리지 않음).
+// ▲▼로 순서를 옮기고 ✎로 이름을 바꾼다. 순서·펼침은 PREFS_FILE에, 이름은 scan_sessions.py가 따로 파일에 남긴다(대화 기록은 건드리지 않음).
 
 const PANE = 'session-list'
 const TITLE = '세션 목록'
-const PREFS_KEY = 'prefs'
+const PREFS_KEY = 'prefs' // 예전 $.store 자리. 파일이 없을 때 한 번 옮겨 오는 데만 쓴다.
+// 두 계정이 같이 쓰고, .claude 동기화로 다른 PC에도 간다.
+const PREFS_FILE = '.claude/plugins/mod-session-list-prefs.json'
 const EMPTY_PREFS: Prefs = {
   projectOrder: [], sessionOrder: {}, expanded: [], sortMode: 'manual', minimized: false,
 }
@@ -121,9 +123,21 @@ const ROW_EXTRA = 22
 
 const FOLDER_BG = '#3a4a5e' // 폴더 이름 배경(남회색)
 
+const prefsPath = async ($: EngineInterface) => `${await $.env.get('USERPROFILE')}/${PREFS_FILE}`
+
+async function loadPrefs($: EngineInterface): Promise<Prefs | undefined> {
+  try {
+    return { ...EMPTY_PREFS, ...JSON.parse(await $.fs.read(await prefsPath($))) }
+  } catch {
+    return undefined
+  }
+}
+
+// 탭마다 들고 있는 값은 다른 탭이 바꾼 것을 모르므로, 저장할 때마다 파일을 새로 읽어 거기에 고친다.
 async function savePrefs($: EngineInterface, fn: (prefs: Prefs) => Prefs) {
-  await update($, prefsAtom, fn)
-  await $.store.set(PREFS_KEY, await read($, prefsAtom))
+  const next = fn((await loadPrefs($)) ?? (await read($, prefsAtom)))
+  await update($, prefsAtom, () => next)
+  await $.fs.write(await prefsPath($), JSON.stringify(next, null, 1))
 }
 
 const runScan = ($: EngineInterface, args: string[] = []) =>
@@ -143,6 +157,9 @@ async function refresh($: EngineInterface) {
     }
     const scan = JSON.parse(stdout) as ScanResult
     await update($, scanAtom, () => scan)
+    // 다른 탭·PC에서 옮긴 순서도 따라온다.
+    const prefs = await loadPrefs($)
+    if (prefs) await update($, prefsAtom, () => prefs)
   } finally {
     await update($, loadingAtom, () => false)
   }
@@ -163,7 +180,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await $.command.register({ name: 'mod-session-list', description: '[mod] 세션 목록 패널 열기' })
-    const saved = (await $.store.get(PREFS_KEY)) as Prefs | undefined
+    const saved = (await loadPrefs($)) ?? ((await $.store.get(PREFS_KEY)) as Prefs | undefined)
     // 처음 쓸 때는 지금 작업 폴더만 펼쳐 둔다.
     const first = { ...EMPTY_PREFS, expanded: [projectKey(await $.session.cwd())] }
     await update($, prefsAtom, () => (saved ? { ...EMPTY_PREFS, ...saved } : first))
