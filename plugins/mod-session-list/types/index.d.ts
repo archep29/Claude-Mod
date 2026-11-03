@@ -10,7 +10,6 @@ export type SessionRow = {
 export type ScanResult = { account: number; wt: string; launcher: string; sessions: SessionRow[] }
 
 export type Prefs = {
-  aliases: Record<string, string>
   projectOrder: string[]
   sessionOrder: Record<string, string[]>
   expanded: string[]

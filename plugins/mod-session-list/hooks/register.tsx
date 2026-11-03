@@ -5,13 +5,13 @@ import type { Prefs, ScanResult, SessionRow } from '../types'
 
 // 최근 30일 세션을 프로젝트(작업 폴더)별로 묶어 최근 대화가 위로 오게 보여주고, 누르면 새 탭에서 연다.
 // /mod-session-list로 열고 닫는다. 「_ 최소화」를 누르면 패널을 닫고 입력창 위에 다시 여는 한 줄만 남긴다.
-// ▲▼로 순서를 옮기고 ✎로 이름을 바꾼다. 순서·이름은 $.store에 남는다(대화 기록은 건드리지 않음).
+// ▲▼로 순서를 옮기고 ✎로 이름을 바꾼다. 순서는 $.store에, 이름은 scan_sessions.py가 따로 파일에 남긴다(대화 기록은 건드리지 않음).
 
 const PANE = 'session-list'
 const TITLE = '세션 목록'
 const PREFS_KEY = 'prefs'
 const EMPTY_PREFS: Prefs = {
-  aliases: {}, projectOrder: [], sessionOrder: {}, expanded: [], sortMode: 'manual', minimized: false,
+  projectOrder: [], sessionOrder: {}, expanded: [], sortMode: 'manual', minimized: false,
 }
 
 const scanAtom = atom({ plugin: 'mod-session-list', key: 'scan' } as const, null)
@@ -126,15 +126,17 @@ async function savePrefs($: EngineInterface, fn: (prefs: Prefs) => Prefs) {
   await $.store.set(PREFS_KEY, await read($, prefsAtom))
 }
 
+const runScan = ($: EngineInterface, args: string[] = []) =>
+  $.process.run(['py', '-I', `${$.plugin.root}/hooks/scan_sessions.py`, ...args], {
+    env: { PYTHONIOENCODING: 'utf-8' },
+    timeoutMs: 60_000,
+  })
+
 async function refresh($: EngineInterface) {
   if (await read($, loadingAtom)) return
   await update($, loadingAtom, () => true)
   try {
-    const script = `${$.plugin.root}/hooks/scan_sessions.py`
-    const { exitCode, stdout, stderr } = await $.process.run(['py', '-I', script], {
-      env: { PYTHONIOENCODING: 'utf-8' },
-      timeoutMs: 60_000,
-    })
+    const { exitCode, stdout, stderr } = await runScan($)
     if (exitCode !== 0) {
       $.ui.log(`세션 목록 읽기 실패: ${stderr.slice(0, 300)}`, { to: 'debug' })
       return
@@ -215,7 +217,7 @@ export const register: Register = on => {
       const argv = [scan.wt, '-w', '0', 'new-tab', '-d', row.cwd, ...shell, ...run]
       const { exitCode, stderr } = await $.process.run(argv)
       if (exitCode !== 0) $.ui.toast(`탭을 열지 못했습니다: ${stderr.slice(0, 200)}`)
-      else $.ui.toast(`새 탭에서 여는 중: ${prefs.aliases[row.id] ?? row.title}`)
+      else $.ui.toast(`새 탭에서 여는 중: ${row.title}`)
     }
 
     // 날짜순 ↔ 내가 ▲▼로 옮긴 순서. 옮긴 순서는 날짜순일 때도 남아 있다.
@@ -242,14 +244,10 @@ export const register: Register = on => {
       }))
 
     const rename = async (id: string, text: string) => {
-      const name = text.trim()
-      await savePrefs($, p => {
-        const aliases = { ...p.aliases }
-        if (name) aliases[id] = name
-        else delete aliases[id]
-        return { ...p, aliases }
-      })
+      const { exitCode, stderr } = await runScan($, ['--rename', id, text.trim()])
+      if (exitCode !== 0) $.ui.toast(`이름을 저장하지 못했습니다: ${stderr.slice(0, 200)}`)
       await update($, editingAtom, () => '')
+      await refresh($)
     }
 
     return (
@@ -275,7 +273,7 @@ export const register: Register = on => {
               </Box>
               {isOpen &&
                 project.sessions.map(row => {
-                  const name = prefs.aliases[row.id] ?? row.title
+                  const name = row.title
                   if (editing === row.id) {
                     return (
                       <Box key={`e:${row.id}`} flexDirection="row">

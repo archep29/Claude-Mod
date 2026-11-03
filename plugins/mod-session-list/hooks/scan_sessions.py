@@ -2,8 +2,10 @@
 
 출력: {"account": 1|2, "wt": wt.exe 경로, "launcher": 전용 실행 파일(없으면 ""), "sessions":[{id, cwd, title, started, updated, running}]}
 - cwd·시작 시각: 대화 기록 앞부분의 첫 user 줄
-- 제목: 기록 끝부분의 마지막 custom-title, 없으면 첫 질문 글자
+- 제목: 패널에서 ✎로 바꾼 이름, 없으면 기록 끝부분의 마지막 custom-title, 없으면 첫 질문 글자
 - running: 이 PC에서 지금 켜져 있는 세션(sessions/*.json의 pid가 살아 있음)
+
+`--rename 세션ID 이름`으로 부르면 ✎ 이름만 저장한다(빈 이름이면 지운다).
 """
 import ctypes
 import glob
@@ -17,6 +19,9 @@ HOME = os.path.expanduser("~")
 PROJECTS = os.path.join(HOME, ".claude", "projects")
 SESSION_DIRS = [os.path.join(HOME, d, "sessions")
                 for d in (".claude", ".claude-account1", ".claude-account2")]
+# ✎ 이름. 패널 저장소($.store)는 탭마다 들고 있던 옛 값으로 통째로 덮어써 이름이 날아가서 따로 둔다.
+# 두 계정이 같이 쓰고, .claude 동기화로 다른 PC에도 간다.
+NAMES = os.path.join(HOME, ".claude", "plugins", "mod-session-list-names.json")
 DAYS = 30
 # 이 파일이 있는 PC는 이것으로 세션을 열고(계정 선택·탭 기억), 없으면 claude --resume으로 연다.
 LAUNCHER = r"D:\dev\claude-launcher.ps1"
@@ -103,9 +108,32 @@ def read_title(path):
     return ""
 
 
+def load_names():
+    try:
+        with open(NAMES, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_name(sid, name):
+    """그때그때 파일을 새로 읽어 이 세션 이름만 바꾼다(다른 탭이 바꾼 이름은 그대로)."""
+    names = load_names()
+    if name:
+        names[sid] = name
+    else:
+        names.pop(sid, None)
+    os.makedirs(os.path.dirname(NAMES), exist_ok=True)
+    tmp = NAMES + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(names, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, NAMES)
+
+
 def main():
     cutoff = time.time() - DAYS * 86400
     running = running_sessions()
+    names = load_names()
     sessions = []
     for path in glob.glob(os.path.join(PROJECTS, "*", "*.jsonl")):
         try:
@@ -116,7 +144,7 @@ def main():
             if not cwd:
                 continue  # 대화가 없는 빈 기록
             sid = os.path.splitext(os.path.basename(path))[0]
-            title = running.get(sid) or read_title(path) or first_prompt or sid[:8]
+            title = names.get(sid) or running.get(sid) or read_title(path) or first_prompt or sid[:8]
         except OSError:
             continue
         sessions.append({
@@ -137,4 +165,7 @@ def main():
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
-    main()
+    if len(sys.argv) == 4 and sys.argv[1] == "--rename":
+        save_name(sys.argv[2], sys.argv[3].strip())
+    else:
+        main()
