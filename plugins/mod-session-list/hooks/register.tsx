@@ -269,8 +269,8 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column" marginTop={1}>
-        <Box flexDirection="row" gap={1}>
-          <Text dimColor>최근 30일 · {scan.sessions.length}개</Text>
+        <Box flexDirection="row" gap={2} marginBottom={1}>
+          <Text dimColor>{scan.sessions.length}개</Text>
           <Button key="refresh" plain dimColor label={loading ? '읽는 중' : '↻ 새로고침'} onPress={() => void refresh($)} />
           <Button key="sort-mode" plain dimColor label={prefs.sortMode === 'date' ? '⇅ 날짜순' : '⇅ 내 순서'} onPress={() => void toggleSort()} />
           <Button key="minimize" plain dimColor label="_ 최소화" onPress={() => void minimize($)} />
@@ -278,15 +278,25 @@ export const register: Register = on => {
         {projects.map(project => {
           const isOpen = prefs.expanded.includes(project.key)
           const runningCount = project.sessions.filter(s => s.running).length
+          // 안 쓴 지 오래된 폴더는 흐리게. 켜진 세션이 있으면 그대로 둔다.
+          const isIdle = !runningCount && project.sessions.every(s => isOld(s.updated))
+          const folderLabel = `${isOpen ? '▾' : '▸'} ${folderName(project.cwd)} `
           return (
-            <Box key={`p:${project.key}`} flexDirection="column">
-              <Box flexDirection="row" gap={1}>
+            <Box key={`p:${project.key}`} flexDirection="column" marginBottom={isOpen ? 1 : 0}>
+              <Box key={`ph:${project.key}`} flexDirection="row" gap={1}>
                 <Button key={`pt:${project.key}`} plain onPress={() => void toggle(project.key)}>
-                  <Text bold backgroundColor={FOLDER_BG}>{`${isOpen ? '▾' : '▸'} ${folderName(project.cwd)} `}</Text>
-                  <Text dimColor>{' '}{project.sessions.length}{runningCount ? ` · 켜짐 ${runningCount}` : ''}</Text>
+                  {/* 펼친 폴더만 배경을 칠해 열린 곳이 바로 보이게 한다 */}
+                  {isOpen
+                    ? <Text bold backgroundColor={FOLDER_BG}>{folderLabel}</Text>
+                    : <Text dimColor={isIdle}>{folderLabel}</Text>}
+                  <Text dimColor>{project.sessions.length}</Text>
                 </Button>
-                <Button key={`pu:${project.key}`} plain dimColor label="▲" onPress={() => void moveProject(project.key, -1)} />
-                <Button key={`pd:${project.key}`} plain dimColor label="▼" onPress={() => void moveProject(project.key, 1)} />
+                {runningCount > 0 && <Text color="success">● {runningCount}</Text>}
+                {/* ▲▼는 평소에 숨기고, 이 줄에 마우스를 올리면 나타난다 */}
+                <Box flexDirection="row" gap={1} display="none" hover={{ display: 'flex' }}>
+                  <Button key={`pu:${project.key}`} plain dimColor label="▲" onPress={() => void moveProject(project.key, -1)} />
+                  <Button key={`pd:${project.key}`} plain dimColor label="▼" onPress={() => void moveProject(project.key, 1)} />
+                </Box>
               </Box>
               {isOpen &&
                 project.sessions.map(row => {
@@ -337,7 +347,7 @@ export const register: Register = on => {
           )
         })}
         <Text dimColor>
-          <Text color="error">◆</Text> 이 창 · <Text color="success">●</Text> 다른 탭에서 켜짐 · 줄에 마우스를 올리면 ▲▼✎
+          <Text color="error">◆</Text> 이 창 <Text color="success">●</Text> 켜짐 · 마우스 올리면 ▲▼✎
         </Text>
       </Box>
     )
