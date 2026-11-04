@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 const PANE = 'prompt-toc'
-const TITLE = '내 질문 목차'
+const TITLE = '질문내역'
 const MARK_BG = '#5c5000' // 체크한 질문 배경(어두운 노랑)
 
 // 체크한 질문들(질문 글 앞 200자로 구별). 세션마다 $.store에 남겨 창을 닫거나 다시 열어도 유지된다.
@@ -41,7 +41,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'mod-prompt-toc',
-      description: '[mod] 내가 적은 질문 목차 창 열기',
+      description: '[mod] 내가 적은 질문내역 창 열기',
     })
     const saved = (await $.store.get(await storeKey($))) as string[] | undefined
     if (saved) await update($, marksAtom, () => saved)
@@ -64,10 +64,10 @@ export const register: Register = on => {
     // 열려 있으면 닫고, 닫혀 있으면 연다.
     if ((await $.ui.panes()).some(pane => pane.id === PANE)) {
       await $.ui.close({ id: PANE })
-      return { text: '질문 목차 창을 닫았습니다.' }
+      return { text: '질문내역 창을 닫았습니다.' }
     }
     await $.ui.open({ id: PANE, title: TITLE })
-    return { text: '질문 목차 창을 열었습니다.' }
+    return { text: '질문내역 창을 열었습니다.' }
   })
 
   // 사용자 글이 대화 기록에 들어간 직후 목차를 다시 그린다.
