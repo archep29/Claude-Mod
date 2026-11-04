@@ -112,7 +112,7 @@ export const register: Register = on => {
       })
 
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" marginTop={1}>
         {lines.map((line, index) =>
           index === editing ? (
             <Input

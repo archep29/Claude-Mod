@@ -268,7 +268,7 @@ export const register: Register = on => {
     }
 
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" marginTop={1}>
         <Box flexDirection="row" gap={1}>
           <Text dimColor>최근 30일 · {scan.sessions.length}개</Text>
           <Button key="refresh" plain dimColor label={loading ? '읽는 중' : '↻ 새로고침'} onPress={() => void refresh($)} />
