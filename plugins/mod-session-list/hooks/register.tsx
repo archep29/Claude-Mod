@@ -8,7 +8,7 @@ import type { Prefs, ScanResult, SessionRow } from '../types'
 // ▲▼로 순서를 옮기고 ✎로 이름을 바꾼다. 순서·펼침은 PREFS_FILE에, 이름은 scan_sessions.py가 따로 파일에 남긴다(대화 기록은 건드리지 않음).
 
 const PANE = 'session-list'
-const TITLE = '세션 목록'
+const TITLE = '세션목록'
 const PREFS_KEY = 'prefs' // 예전 $.store 자리. 파일이 없을 때 한 번 옮겨 오는 데만 쓴다.
 // 두 계정이 같이 쓰고, .claude 동기화로 다른 PC에도 간다.
 const PREFS_FILE = '.claude/plugins/mod-session-list-prefs.json'
@@ -152,7 +152,7 @@ async function refresh($: EngineInterface) {
   try {
     const { exitCode, stdout, stderr } = await runScan($)
     if (exitCode !== 0) {
-      $.ui.log(`세션 목록 읽기 실패: ${stderr.slice(0, 300)}`, { to: 'debug' })
+      $.ui.log(`세션목록 읽기 실패: ${stderr.slice(0, 300)}`, { to: 'debug' })
       return
     }
     const scan = JSON.parse(stdout) as ScanResult
@@ -179,7 +179,7 @@ async function minimize($: EngineInterface) {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
-    await $.command.register({ name: 'mod-session-list', description: '[mod] 세션 목록 패널 열기' })
+    await $.command.register({ name: 'mod-session-list', description: '[mod] 세션목록 패널 열기' })
     const saved = (await loadPrefs($)) ?? ((await $.store.get(PREFS_KEY)) as Prefs | undefined)
     // 처음 쓸 때는 지금 작업 폴더만 펼쳐 둔다.
     const first = { ...EMPTY_PREFS, expanded: [projectKey(await $.session.cwd())] }
@@ -195,11 +195,11 @@ export const register: Register = on => {
     // 열려 있으면 닫고, 닫혀 있으면 연다.
     if ((await $.ui.panes()).some(pane => pane.id === PANE)) {
       await $.ui.close({ id: PANE })
-      return { text: '세션 목록을 닫았습니다.' }
+      return { text: '세션목록을 닫았습니다.' }
     }
     await openPane($)
     void refresh($)
-    return { text: '세션 목록을 열었습니다.' }
+    return { text: '세션목록을 열었습니다.' }
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
@@ -347,6 +347,6 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || !(await read($, prefsAtom)).minimized) return next(e)
     const { Button } = $.ui.resolve(e)
-    return <Button key="restore" plain dimColor label="▸ 세션 목록" onPress={() => void openPane($)} />
+    return <Button key="restore" plain dimColor label="▸ 세션목록" onPress={() => void openPane($)} />
   })
 }

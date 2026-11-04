@@ -19,9 +19,9 @@ Claude Code 터미널에 붙여 쓰는 모드 2개입니다.
 
 아래 그림은 사용법을 보여 주는 예시 화면입니다. 내용은 지어낸 것입니다.
 
-### 세션 목록 (`mod-session-list`)
+### 세션목록 (`mod-session-list`)
 
-![세션 목록 패널 예시](docs/session-list.png)
+![세션목록 패널 예시](docs/session-list.png)
 
 ![최소화했을 때 예시](docs/session-list-minimized.png)
 
@@ -57,11 +57,11 @@ claude plugin install mod-memo --marketplace archep29/Claude-Mod
 
 | 모드 | 켜기 | 끄기 |
 |---|---|---|
-| 세션 목록 | `/mod-session-list` | `/mod-session-list` 한 번 더, 또는 「_ 최소화」 |
+| 세션목록 | `/mod-session-list` | `/mod-session-list` 한 번 더, 또는 「_ 최소화」 |
 | 질문내역 | `/mod-prompt-toc` | `/mod-prompt-toc` 한 번 더, 또는 패널 오른쪽 위 `×` |
 | 메모 | `/mod-memo` | `/mod-memo` 한 번 더, 또는 패널 오른쪽 위 `×` |
 
-- 세션 목록을 「_ 최소화」로 접으면 입력창 위 「▸ 세션 목록」 한 줄만 남고, 그 줄을 누르면 다시 열립니다.
+- 세션목록을 「_ 최소화」로 접으면 입력창 위 「▸ 세션목록」 한 줄만 남고, 그 줄을 누르면 다시 열립니다.
 - 모드 자체를 아예 쓰지 않으려면 `/plugin`에서 끄거나 지웁니다.
 
 ## mod-session-list 필요 조건

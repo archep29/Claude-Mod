@@ -1,4 +1,4 @@
-"""최근 30일 Claude 세션 목록을 JSON으로 출력한다 (세션 목록 패널이 부른다).
+"""최근 30일 Claude 세션목록을 JSON으로 출력한다 (세션목록 패널이 부른다).
 
 출력: {"account": 1|2, "wt": wt.exe 경로, "launcher": 전용 실행 파일(없으면 ""), "sessions":[{id, cwd, title, started, updated, running}]}
 - cwd·시작 시각: 대화 기록 앞부분의 첫 user 줄
