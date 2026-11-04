@@ -2,7 +2,7 @@
 
 출력: {"account": 1|2, "wt": wt.exe 경로, "launcher": 전용 실행 파일(없으면 ""), "sessions":[{id, cwd, title, started, updated, running}]}
 - cwd·시작 시각: 대화 기록 앞부분의 첫 user 줄
-- 제목: 패널에서 ✎로 바꾼 이름, 없으면 기록 끝부분의 마지막 custom-title, 없으면 첫 질문 글자
+- 제목: 패널에서 ✎로 바꾼 이름, 없으면 기록 끝부분의 마지막 custom-title(/rename), ai-title(AI가 지은 제목), 첫 질문 글자 순
 - running: 이 PC에서 지금 켜져 있는 세션(sessions/*.json의 pid가 살아 있음)
 
 `--rename 세션ID 이름`으로 부르면 ✎ 이름만 저장한다(빈 이름이면 지운다).
@@ -40,9 +40,9 @@ def is_alive(pid):
 
 
 def running_sessions():
-    """{sessionId: 지금 이름} — 이 PC에서 켜져 있는 세션만."""
+    """이 PC에서 켜져 있는 세션 id들."""
     domain = "win32:" + socket.gethostname().lower()
-    found = {}
+    found = set()
     for folder in SESSION_DIRS:
         for path in glob.glob(os.path.join(folder, "*.json")):
             try:
@@ -55,7 +55,7 @@ def running_sessions():
             pid = info.get("pid")
             sid = info.get("sessionId")
             if isinstance(pid, int) and sid and is_alive(pid):
-                found[sid] = info.get("name") or ""
+                found.add(sid)
     return found
 
 
@@ -91,13 +91,14 @@ def read_head(path):
 
 
 def read_title(path):
-    """기록 끝부분에서 마지막 custom-title."""
+    """기록 끝부분에서 마지막 custom-title, 없으면 마지막 ai-title."""
     size = os.path.getsize(path)
     with open(path, "rb") as f:
         f.seek(max(0, size - TAIL_BYTES))
         tail = f.read().decode("utf-8", errors="replace")
+    ai_title = ""
     for line in reversed(tail.splitlines()):
-        if '"custom-title"' not in line:
+        if '"custom-title"' not in line and '"ai-title"' not in line:
             continue
         try:
             entry = json.loads(line)
@@ -105,7 +106,9 @@ def read_title(path):
             continue
         if entry.get("type") == "custom-title" and entry.get("customTitle"):
             return entry["customTitle"]
-    return ""
+        if not ai_title and entry.get("type") == "ai-title":
+            ai_title = entry.get("aiTitle") or ""
+    return ai_title
 
 
 def load_names():
@@ -144,7 +147,7 @@ def main():
             if not cwd:
                 continue  # 대화가 없는 빈 기록
             sid = os.path.splitext(os.path.basename(path))[0]
-            title = names.get(sid) or running.get(sid) or read_title(path) or first_prompt or sid[:8]
+            title = names.get(sid) or read_title(path) or first_prompt or sid[:8]
         except OSError:
             continue
         sessions.append({
