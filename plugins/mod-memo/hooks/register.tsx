@@ -1,50 +1,49 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
+import type { MemoLines } from '../types'
+
 // 오른쪽 패널에 메모 탭을 띄운다. 모든 창이 메모 하나를 같이 쓴다. /mod-memo로 열고 닫는다.
-// 글자를 치다 멈추면 저절로 저장하고, 몇 초마다 파일을 다시 읽어 다른 탭에서 고친 것을 따라온다.
+// 입력칸은 끝에 글자를 붙이고 지우기만 되고 Enter를 치면 비워진다. 그래서 Enter마다 한 줄씩 쌓고, 줄을 누르면 고친다.
 
 const PANE = 'memo'
 const TITLE = '메모'
-// 두 계정이 같이 쓰고, .claude 동기화로 다른 PC에도 간다.
+// 한 줄에 메모 한 줄. 두 계정이 같이 쓰고, .claude 동기화로 다른 PC에도 간다.
 const MEMO_FILE = '.claude/plugins/mod-memo.txt'
-const SAVE_DELAY_MS = 1_000 // 치는 도중에 입력칸을 다시 그리면 방금 친 글자가 지워져서, 멈춘 뒤에 저장한다.
 const REFRESH_MS = 5_000
+const NOT_EDITING = -1
 
 // null이면 파일을 못 읽은 것: 입력칸을 내지 않아 빈 메모로 덮어쓰는 일을 막는다.
-const textAtom = atom({ plugin: 'mod-memo', key: 'text' } as const, null)
-
-let typedCount = 0 // 친 횟수. 멈췄는지 알아보는 데 쓴다.
-let unsaved = false
+const linesAtom = atom({ plugin: 'mod-memo', key: 'lines' } as const, null as MemoLines)
+const editingAtom = atom({ plugin: 'mod-memo', key: 'editing' } as const, NOT_EDITING)
 
 const memoPath = async ($: EngineInterface) => `${await $.env.get('USERPROFILE')}/${MEMO_FILE}`
 
+async function loadLines($: EngineInterface): Promise<string[]> {
+  const path = await memoPath($)
+  if (!(await $.fs.exists(path))) return []
+  return (await $.fs.read(path)).split(/\r?\n/).filter(line => line.trim())
+}
+
 async function refresh($: EngineInterface) {
-  if (unsaved) return
   try {
-    const path = await memoPath($)
-    const text = (await $.fs.exists(path)) ? await $.fs.read(path) : ''
-    if (!unsaved && text !== (await read($, textAtom))) await update($, textAtom, () => text)
+    const lines = await loadLines($)
+    const shown = await read($, linesAtom)
+    if (lines.join('\n') !== shown?.join('\n')) await update($, linesAtom, () => lines)
   } catch (error) {
     $.ui.log(`메모 읽기 실패: ${error}`, { to: 'debug' })
   }
 }
 
-async function save($: EngineInterface, text: string) {
-  unsaved = false
+// 다른 탭이 고친 줄을 덮어쓰지 않게, 저장할 때마다 파일을 새로 읽어 거기에 고친다.
+async function changeLines($: EngineInterface, fn: (lines: string[]) => string[]) {
   try {
-    await $.fs.write(await memoPath($), text)
-    await update($, textAtom, () => text)
+    const lines = fn(await loadLines($))
+    await $.fs.write(await memoPath($), lines.join('\n'))
+    await update($, linesAtom, () => lines)
   } catch (error) {
     $.ui.toast(`메모를 저장하지 못했습니다: ${error}`)
   }
-}
-
-async function saveWhenStopped($: EngineInterface, text: string) {
-  unsaved = true
-  const mine = ++typedCount
-  await $.clock.sleep(SAVE_DELAY_MS)
-  if (mine === typedCount) await save($, text)
 }
 
 export const register: Register = on => {
@@ -69,25 +68,49 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text, Input } = $.ui.resolve(e)
-    const text = await read($, textAtom)
-    if (text === null) return <Text dimColor>메모를 읽지 못했습니다.</Text>
+    const { Box, Text, Button, Input } = $.ui.resolve(e)
+    const lines = await read($, linesAtom)
+    const editing = await read($, editingAtom)
+    if (lines === null) return <Text dimColor>메모를 읽지 못했습니다.</Text>
+
+    const add = (text: string) => {
+      const line = text.trim()
+      if (line) void changeLines($, all => [...all, line])
+    }
+
+    // 글자를 다 지우고 Enter를 치면 그 줄을 지운다.
+    const edit = async (old: string, text: string) => {
+      const line = text.trim()
+      await changeLines($, all => {
+        const at = all.indexOf(old)
+        if (at < 0) return all
+        return [...all.slice(0, at), ...(line ? [line] : []), ...all.slice(at + 1)]
+      })
+      await update($, editingAtom, () => NOT_EDITING)
+    }
+
     return (
       <Box flexDirection="column">
-        <Input
-          key="memo"
-          value={text}
-          rows={Math.max(3, e.props.scroll.bodyRows - 1)}
-          placeholder="여기를 눌러 메모를 적으세요"
-          submitLabel="저장"
-          autoFocus
-          onInput={value => void saveWhenStopped($, value)}
-          onSubmit={value => {
-            typedCount++
-            void save($, value)
-          }}
-        />
-        <Text dimColor>저절로 저장됨 · 줄바꿈은 Shift+Enter</Text>
+        {lines.map((line, index) =>
+          index === editing ? (
+            <Input
+              key={`edit:${index}`}
+              value={line}
+              submitLabel="저장"
+              autoFocus
+              onSubmit={value => void edit(line, value)}
+            />
+          ) : (
+            <Button
+              key={`line:${index}`}
+              plain
+              label={line}
+              onPress={() => void update($, editingAtom, () => index)}
+            />
+          ),
+        )}
+        <Input key="new" placeholder="메모를 적고 Enter" submitLabel="추가" autoFocus onSubmit={add} />
+        <Text dimColor>Enter로 한 줄씩 추가 · 줄을 누르면 고침 · 글자를 다 지우고 Enter면 삭제</Text>
       </Box>
     )
   })
