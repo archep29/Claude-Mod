@@ -124,14 +124,17 @@ export const register: Register = on => {
         {lines.map((line, index) =>
           index === editing ? (
             <Box key={`editrow:${index}`} flexDirection="row" gap={1}>
-              <Text>·</Text>
-              <Input
-                key={`edit:${index}`}
-                value={line}
-                submitLabel="저장"
-                autoFocus
-                onSubmit={value => void edit(index, line, value)}
-              />
+              <Box width={textCells} gap={1}>
+                <Text>·</Text>
+                <Input
+                  key={`edit:${index}`}
+                  value={line}
+                  submitLabel="저장"
+                  autoFocus
+                  onSubmit={value => void edit(index, line, value)}
+                />
+              </Box>
+              <Button key={`editdel:${index}`} plain dimColor label="삭제" onPress={() => void remove(index, line)} />
             </Box>
           ) : (
             <Box key={`row:${index}`} flexDirection="row" gap={1}>
