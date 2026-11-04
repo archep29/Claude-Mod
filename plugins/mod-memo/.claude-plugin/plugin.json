@@ -1,0 +1,1 @@
+{ "name": "mod-memo", "version": "0.1.0", "description": "오른쪽 패널에 메모 탭을 띄워 메모를 적어 두는 모드", "types": "./types/index.d.ts" }

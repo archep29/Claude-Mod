@@ -3,6 +3,7 @@
   "owner": { "name": "archep29" },
   "plugins": [
     { "name": "mod-session-list", "source": "./plugins/mod-session-list" },
-    { "name": "mod-prompt-toc", "source": "./plugins/mod-prompt-toc" }
+    { "name": "mod-prompt-toc", "source": "./plugins/mod-prompt-toc" },
+    { "name": "mod-memo", "source": "./plugins/mod-memo" }
   ]
 }

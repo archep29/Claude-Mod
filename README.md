@@ -13,6 +13,7 @@ Claude Code 터미널에 붙여 쓰는 모드 2개입니다.
 |---|---|---|
 | `mod-session-list` | 최근 30일 세션을 프로젝트별로 보여 주는 패널. 누르면 새 탭에서 그 세션을 엽니다. | `/mod-session-list` |
 | `mod-prompt-toc` | 이 대화에서 내가 적은 질문(프롬프트)만 모아 목차로 보여 줍니다. 누르면 그 질문으로 이동합니다. | `/mod-prompt-toc` |
+| `mod-memo` | 오른쪽 패널의 메모 탭에 메모를 적어 둡니다. 모든 창이 같은 메모를 봅니다. | `/mod-memo` |
 
 ## 어떻게 쓰나요
 
@@ -35,6 +36,7 @@ Claude Code 입력창에서:
 ```
 /plugin install mod-session-list --marketplace archep29/Claude-Mod
 /plugin install mod-prompt-toc --marketplace archep29/Claude-Mod
+/plugin install mod-memo --marketplace archep29/Claude-Mod
 ```
 
 `Add marketplace?`가 나오면 `y`, 범위는 Enter로 고릅니다.
@@ -44,6 +46,7 @@ Claude Code 입력창에서:
 ```
 claude plugin install mod-session-list --marketplace archep29/Claude-Mod
 claude plugin install mod-prompt-toc --marketplace archep29/Claude-Mod
+claude plugin install mod-memo --marketplace archep29/Claude-Mod
 ```
 
 데스크톱 앱에서는 입력창 옆 + → Plugins → Add marketplace에 `archep29/Claude-Mod`를 넣고 Add plugin을 누릅니다.
@@ -56,6 +59,7 @@ claude plugin install mod-prompt-toc --marketplace archep29/Claude-Mod
 |---|---|---|
 | 세션 목록 | `/mod-session-list` | `/mod-session-list` 한 번 더, 또는 「_ 최소화」 |
 | 내 질문 목차 | `/mod-prompt-toc` | `/mod-prompt-toc` 한 번 더, 또는 패널 오른쪽 위 `×` |
+| 메모 | `/mod-memo` | `/mod-memo` 한 번 더, 또는 패널 오른쪽 위 `×` |
 
 - 세션 목록을 「_ 최소화」로 접으면 입력창 위 「▸ 세션 목록」 한 줄만 남고, 그 줄을 누르면 다시 열립니다.
 - 모드 자체를 아예 쓰지 않으려면 `/plugin`에서 끄거나 지웁니다.
