@@ -117,6 +117,7 @@ export const register: Register = on => {
           index === editing ? (
             <Input
               key={`edit:${index}`}
+              label="· "
               value={line}
               submitLabel="저장"
               autoFocus
@@ -124,7 +125,8 @@ export const register: Register = on => {
             />
           ) : (
             <Box key={`row:${index}`} flexDirection="row" gap={1}>
-              <Box width={textCells}>
+              <Box width={textCells} gap={1}>
+                <Text>{line ? '·' : ' '}</Text>
                 <Button
                   key={`line:${index}`}
                   plain
@@ -141,8 +143,17 @@ export const register: Register = on => {
             </Box>
           ),
         )}
-        <Input key="new" placeholder="메모를 적고 Enter" submitLabel="추가" autoFocus onSubmit={add} />
-        <Text dimColor>그냥 Enter면 빈 줄 · 줄을 누르면 고침 · 줄에 마우스를 올리면 ▲▼×</Text>
+        <Box flexDirection="column" marginTop={1}>
+          <Input
+            key="new"
+            label="+ "
+            placeholder="메모를 적고 Enter (빈칸이면 빈 줄)"
+            submitLabel="추가"
+            autoFocus
+            onSubmit={add}
+          />
+          <Text dimColor>줄 누르면 고침 · 마우스 올리면 ▲▼×</Text>
+        </Box>
       </Box>
     )
   })
