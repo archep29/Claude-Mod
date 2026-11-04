@@ -98,6 +98,12 @@ export const register: Register = on => {
       })
     }
 
+    // 누르자마자 칠 수 있게 커서를 입력칸으로 옮긴다.
+    const startEdit = async (index: number) => {
+      await update($, editingAtom, () => index)
+      await $.ui.focus({ requestId: PANE, key: `edit:${index}` })
+    }
+
     const edit = (index: number, line: string, text: string) =>
       changeLine(index, line, (all, at) => all.with(at, text.trim()))
 
@@ -115,14 +121,16 @@ export const register: Register = on => {
       <Box flexDirection="column" marginTop={1}>
         {lines.map((line, index) =>
           index === editing ? (
-            <Input
-              key={`edit:${index}`}
-              label="· "
-              value={line}
-              submitLabel="저장"
-              autoFocus
-              onSubmit={value => void edit(index, line, value)}
-            />
+            <Box key={`editrow:${index}`} flexDirection="row" gap={1}>
+              <Text>·</Text>
+              <Input
+                key={`edit:${index}`}
+                value={line}
+                submitLabel="저장"
+                autoFocus
+                onSubmit={value => void edit(index, line, value)}
+              />
+            </Box>
           ) : (
             <Box key={`row:${index}`} flexDirection="row" gap={1}>
               <Box width={textCells} gap={1}>
@@ -131,7 +139,7 @@ export const register: Register = on => {
                   key={`line:${index}`}
                   plain
                   label={line || ' '}
-                  onPress={() => void update($, editingAtom, () => index)}
+                  onPress={() => void startEdit(index)}
                 />
               </Box>
               {/* 평소에 숨기고, 이 줄에 마우스를 올리면 나타난다 */}
@@ -144,14 +152,16 @@ export const register: Register = on => {
           ),
         )}
         <Box flexDirection="column" marginTop={1}>
-          <Input
-            key="new"
-            label="+ "
-            placeholder="메모를 적고 Enter (빈칸이면 빈 줄)"
-            submitLabel="추가"
-            autoFocus
-            onSubmit={add}
-          />
+          <Box flexDirection="row" gap={1}>
+            <Text>+</Text>
+            <Input
+              key="new"
+              placeholder="메모를 적고 Enter (빈칸이면 빈 줄)"
+              submitLabel="추가"
+              autoFocus
+              onSubmit={add}
+            />
+          </Box>
           <Text dimColor>줄 누르면 고침 · 마우스 올리면 ▲▼×</Text>
         </Box>
       </Box>
