@@ -12,6 +12,8 @@ const TITLE = '메모'
 // 한 줄에 메모 한 줄. 두 계정이 같이 쓰고, .claude 동기화로 다른 PC에도 간다.
 const MEMO_FILE = '.claude/plugins/mod-memo.txt'
 const REFRESH_MS = 5_000
+// 탭은 연 순서대로 놓이고 순서를 정하는 기능이 없어, 세션목록이 열린 뒤에 열어 맨 뒤에 오게 한다.
+const OPEN_DELAY_MS = 1_000
 const NOT_EDITING = -1
 const ROW_BUTTON_CELLS = 7 // 줄 오른쪽 「 ▲ ▼ ×」 칸. 나타날 때 글이 밀리지 않게 미리 비워 둔다.
 
@@ -59,7 +61,7 @@ export const register: Register = on => {
     const started = await next(e)
     await $.command.register({ name: 'mod-memo', description: '[mod] 메모 탭 열기' })
     await refresh($)
-    void $.ui.open({ id: PANE, title: TITLE })
+    $.clock.after(OPEN_DELAY_MS, () => void $.ui.open({ id: PANE, title: TITLE }))
     $.clock.every(REFRESH_MS, () => void refresh($))
     return started
   })
