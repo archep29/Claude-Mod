@@ -19,6 +19,7 @@ const HINT_ROWS = 6 // 편집기 아래 여백·안내문과 위 여백
 
 // null이면 파일을 못 읽은 것: 편집기를 내지 않아 빈 메모로 덮어쓰는 일을 막는다.
 const memoAtom = atom({ plugin: 'mod-memo', key: 'memo' } as const, null as MemoData | null)
+const promptEditsAtom = atom({ plugin: 'mod-memo', key: 'promptEdits' } as const, 0)
 
 let knownText: string | null = null // 이 탭이 마지막으로 읽거나 쓴 파일 내용
 let queue: Promise<void> = Promise.resolve() // 읽기·쓰기가 뒤섞이지 않게 차례로
@@ -106,6 +107,12 @@ export const register: Register = on => {
     return { text: '메모 탭을 열었습니다.' }
   })
 
+  // 키보드가 메모를 떠나도 편집기에는 알림이 없어, 입력창을 고칠 때 대신 알려 준다.
+  on('prompt.edit', async ($, e, next) => {
+    await update($, promptEditsAtom, count => count + 1)
+    return next(e)
+  })
+
   on('ui.message', async ($, e, next) => {
     if (e.requestId !== PANE) return next(e)
     const { lines, copy } = e.data as { lines?: string[]; copy?: string }
@@ -117,13 +124,14 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Client } = $.ui.resolve(e)
     const memo = await read($, memoAtom)
+    const promptEdits = await read($, promptEditsAtom)
     if (memo === null) return <Text dimColor>메모를 읽지 못했습니다.</Text>
     return (
       <Box flexDirection="column" marginTop={1}>
         <Client
           key="editor"
           module="./memo-editor.tsx"
-          props={memo}
+          props={{ ...memo, promptEdits }}
           width="100%"
           height={Math.max(4, e.props.scroll.bodyRows - HINT_ROWS)}
         />

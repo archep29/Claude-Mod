@@ -1,6 +1,6 @@
 import type { ClientKeyEvent, ClientModule, ClientPointerEvent } from 'claude-code'
 
-import type { MemoData } from '../types'
+import type { EditorProps } from '../types'
 
 // 메모 편집기. 입력칸은 Tab·Backspace를 받지 못해 키를 직접 받아 그린다.
 // 파일은 마크다운 목록(- 상위 / 「  - 하위」 / - [x] 완료)이고, 바뀔 때마다 줄 전체를 register.tsx로 보낸다.
@@ -9,8 +9,10 @@ type Item = { sub: boolean; done: boolean; folded: boolean; text: string }
 type Snapshot = { items: Item[]; row: number; col: number }
 type Position = { row: number; col: number }
 // anchor: 선택을 시작한 곳. 커서까지가 선택 구간이다.
+// showCursor: 키보드가 메모에 있을 때만 켠다. promptEdits: 마지막으로 본 입력창 고친 횟수.
 type State = Snapshot & {
   version: number; top: number; undo: Snapshot[]; lastEdit: string; anchor: Position | null; dragging: boolean
+  showCursor: boolean; promptEdits: number
 }
 type VisualRow = { row: number; start: number; chars: string[] }
 
@@ -313,19 +315,23 @@ function positionAt(s: State, rows: VisualRow[], top: number, e: ClientPointerEv
   return { row: visual.row, col: colAtCell(visual, e.x - textStart(s.items[visual.row])) }
 }
 
-function fromProps(memo: MemoData, old: State | undefined): State {
+function fromProps(memo: EditorProps, old: State | undefined): State {
   const items = memo.lines.length ? memo.lines.map(parseLine) : [emptyItem(false)]
   const row = Math.min(old?.row ?? 0, items.length - 1)
   return {
     items, row, col: Math.min(old?.col ?? 0, charsOf(items[row].text).length),
     version: memo.version, top: old?.top ?? 0, undo: [], lastEdit: '', anchor: null, dragging: false,
+    showCursor: old?.showCursor ?? false, promptEdits: old?.promptEdits ?? memo.promptEdits,
   }
 }
 
-const MemoEditor: ClientModule<MemoData, State> = (memo, surface) => {
+const MemoEditor: ClientModule<EditorProps, State> = (memo, surface) => {
   const { Box, Text, Button } = surface.elements
   const old = surface.state
-  const s = old && old.version === memo.version ? old : fromProps(memo, old)
+  const loaded = old && old.version === memo.version ? old : fromProps(memo, old)
+  const s = loaded.promptEdits === memo.promptEdits
+    ? loaded
+    : { ...loaded, showCursor: false, promptEdits: memo.promptEdits }
 
   const columns = surface.columns || FALLBACK_COLUMNS
   const rowsShown = Math.max(1, (surface.rows || 12) - 2) // 맨 아래 두 줄은 여백과 되돌리기 단추
@@ -357,18 +363,20 @@ const MemoEditor: ClientModule<MemoData, State> = (memo, surface) => {
   s.top = top
 
   surface.onKey(e => {
-    apply(pressKey(current, e))
+    apply({ ...pressKey(current, e), showCursor: true })
     if (e.shift) copySelection()
   })
   surface.onPointer(e => {
     if (e.type === 'down' && e.button === 'left') {
-      apply(pressPointer(current, rows, top, e))
+      apply({ ...pressPointer(current, rows, top, e), showCursor: true })
     } else if (e.type === 'move' && current.dragging) {
       const anchor = current.anchor ?? { row: current.row, col: current.col }
       apply({ ...current, ...positionAt(current, rows, top, e), anchor })
     } else if (e.type === 'up' && current.dragging) {
       apply({ ...current, dragging: false })
       copySelection()
+    } else if (e.type === 'leave' && !current.dragging) {
+      apply({ ...current, showCursor: false }) // 입력창으로 가는 길. 메모에 계속 치면 다시 켜진다.
     }
   })
 
@@ -390,7 +398,7 @@ const MemoEditor: ClientModule<MemoData, State> = (memo, surface) => {
         </Text>
       )
     }
-    if (!isCursorRow) return <Text {...look}>{visual.chars.join('')}</Text>
+    if (!isCursorRow || !s.showCursor) return <Text {...look}>{visual.chars.join('')}</Text>
     const at = s.col - visual.start
     return (
       <Text>
