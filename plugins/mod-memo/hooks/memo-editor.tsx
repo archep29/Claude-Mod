@@ -328,7 +328,7 @@ const MemoEditor: ClientModule<MemoData, State> = (memo, surface) => {
   const s = old && old.version === memo.version ? old : fromProps(memo, old)
 
   const columns = surface.columns || FALLBACK_COLUMNS
-  const rowsShown = Math.max(1, (surface.rows || 12) - 1) // 맨 아래 한 줄은 되돌리기 단추
+  const rowsShown = Math.max(1, (surface.rows || 12) - 2) // 맨 아래 두 줄은 여백과 되돌리기 단추
 
   // 한 화면이 그려지기 전에 키가 여러 번 와도 빠지지 않게 최신 상태를 따로 든다.
   let current = s
@@ -431,7 +431,7 @@ const MemoEditor: ClientModule<MemoData, State> = (memo, surface) => {
           </Box>
         )
       })}
-      <Box flexDirection="row" gap={2}>
+      <Box flexDirection="row" gap={2} marginTop={1}>
         <Button key="undo" plain dimColor label="↶ 되돌리기" onPress={() => apply(undo(current))} />
         {selectionOf(s) && <Text dimColor>복사됨</Text>}
       </Box>
