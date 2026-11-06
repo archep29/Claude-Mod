@@ -7,7 +7,11 @@ import type { MemoData } from '../types'
 
 type Item = { sub: boolean; done: boolean; folded: boolean; text: string }
 type Snapshot = { items: Item[]; row: number; col: number }
-type State = Snapshot & { version: number; top: number; undo: Snapshot[]; lastEdit: string }
+type Position = { row: number; col: number }
+// anchor: 선택을 시작한 곳. 커서까지가 선택 구간이다.
+type State = Snapshot & {
+  version: number; top: number; undo: Snapshot[]; lastEdit: string; anchor: Position | null; dragging: boolean
+}
 type VisualRow = { row: number; start: number; chars: string[] }
 
 const FOLD_MARK = ' <!--접음-->' // 마크다운에 접기가 없어, 보기 프로그램에서 안 보이는 주석으로 남긴다
@@ -17,6 +21,7 @@ const BUTTON_CELLS = 7 // 줄 오른쪽 「▲ ▼ ×」 칸
 const FALLBACK_COLUMNS = 40 // 처음 그릴 때는 칸 수를 아직 모른다
 const CURSOR_BG = '#c0c0c0'
 const CURSOR_FG = '#000000'
+const SELECT_BG = '#2f5f9e'
 const SPECIAL_KEYS = new Set([
   'up', 'down', 'left', 'right', 'return', 'enter', 'tab', 'backspace', 'delete', 'escape',
   'pageup', 'pagedown', 'home', 'end', 'insert',
@@ -81,7 +86,41 @@ function changed(s: State, items: Item[], row: number, col: number, edit = ''): 
   const undo = edit && edit === s.lastEdit
     ? s.undo
     : [...s.undo, { items: s.items, row: s.row, col: s.col }].slice(-UNDO_LIMIT)
-  return { ...s, items, row, col, undo, lastEdit: edit }
+  return { ...s, items, row, col, undo, lastEdit: edit, anchor: null }
+}
+
+// 선택 구간을 앞뒤 순서로. 없거나 글자가 없으면 null.
+function selectionOf(s: State): { start: Position; end: Position } | null {
+  const { anchor } = s
+  if (!anchor || (anchor.row === s.row && anchor.col === s.col)) return null
+  const cursor = { row: s.row, col: s.col }
+  const anchorFirst = anchor.row < s.row || (anchor.row === s.row && anchor.col < s.col)
+  return anchorFirst ? { start: anchor, end: cursor } : { start: cursor, end: anchor }
+}
+
+function selectedText(s: State): string {
+  const selection = selectionOf(s)
+  if (!selection) return ''
+  const { start, end } = selection
+  return s.items.slice(start.row, end.row + 1).map((item, index) => {
+    const row = start.row + index
+    const chars = charsOf(item.text)
+    return chars.slice(row === start.row ? start.col : 0, row === end.row ? end.col : chars.length).join('')
+  }).join('\n')
+}
+
+function deleteSelection(s: State): State {
+  const selection = selectionOf(s)
+  if (!selection) return s
+  const { start, end } = selection
+  const before = charsOf(s.items[start.row].text).slice(0, start.col).join('')
+  const after = charsOf(s.items[end.row].text).slice(end.col).join('')
+  const items = [
+    ...s.items.slice(0, start.row),
+    { ...s.items[start.row], text: before + after },
+    ...s.items.slice(end.row + 1),
+  ]
+  return changed(s, items, start.row, start.col)
 }
 
 const setItem = (s: State, patch: Partial<Item>) => s.items.with(s.row, { ...s.items[s.row], ...patch })
@@ -186,7 +225,19 @@ function toggleFold(s: State, row: number): State {
 
 function undo(s: State): State {
   const last = s.undo.at(-1)
-  return last ? { ...s, ...last, undo: s.undo.slice(0, -1), lastEdit: '' } : s
+  return last ? { ...s, ...last, undo: s.undo.slice(0, -1), lastEdit: '', anchor: null } : s
+}
+
+function moveKey(s: State, key: string): State | undefined {
+  switch (key) {
+    case 'up': return moveCursor(s, -1)
+    case 'down': return moveCursor(s, 1)
+    case 'left': return moveLeftRight(s, -1)
+    case 'right': return moveLeftRight(s, 1)
+    case 'home': return { ...s, col: 0, lastEdit: '' }
+    case 'end': return { ...s, col: charsOf(s.items[s.row].text).length, lastEdit: '' }
+    default: return undefined
+  }
 }
 
 function pressKey(s: State, e: ClientKeyEvent): State {
@@ -198,20 +249,17 @@ function pressKey(s: State, e: ClientKeyEvent): State {
     return s
   }
   if (e.meta) return s
+  const moved = moveKey(s, e.key)
+  if (moved) return { ...moved, anchor: e.shift ? (s.anchor ?? { row: s.row, col: s.col }) : null }
+  const hasSelection = selectionOf(s) !== null
   switch (e.key) {
     case 'return':
-    case 'enter': return pressEnter(s)
-    case 'tab': return setLevel(s, !e.shift)
-    case 'backspace': return pressBackspace(s)
-    case 'delete': return pressDelete(s)
-    case 'up': return moveCursor(s, -1)
-    case 'down': return moveCursor(s, 1)
-    case 'left': return moveLeftRight(s, -1)
-    case 'right': return moveLeftRight(s, 1)
-    case 'home': return { ...s, col: 0, lastEdit: '' }
-    case 'end': return { ...s, col: charsOf(s.items[s.row].text).length, lastEdit: '' }
-    case 'space': return typeText(s, ' ')
-    default: return SPECIAL_KEYS.has(e.key) || /^f\d+$/.test(e.key) ? s : typeText(s, e.key)
+    case 'enter': return pressEnter(deleteSelection(s))
+    case 'tab': return setLevel({ ...s, anchor: null }, !e.shift)
+    case 'backspace': return hasSelection ? deleteSelection(s) : pressBackspace(s)
+    case 'delete': return hasSelection ? deleteSelection(s) : pressDelete(s)
+    case 'space': return typeText(deleteSelection(s), ' ')
+    default: return SPECIAL_KEYS.has(e.key) || /^f\d+$/.test(e.key) ? s : typeText(deleteSelection(s), e.key)
   }
 }
 
@@ -256,7 +304,13 @@ function pressPointer(s: State, rows: VisualRow[], top: number, e: ClientPointer
   const isFirst = visual.start === 0
   if (isFirst && e.x < 2 && hasChildren(s.items, visual.row)) return toggleFold(s, visual.row)
   if (isFirst && e.x >= bulletCell(item) && e.x < textStart(item)) return toggleDone(s, visual.row)
-  return { ...s, row: visual.row, col: colAtCell(visual, e.x - textStart(item)), lastEdit: '' }
+  return { ...s, ...positionAt(s, rows, top, e), lastEdit: '', anchor: null, dragging: true }
+}
+
+// 끌다가 영역 밖으로 나가도 가장 가까운 줄로 본다.
+function positionAt(s: State, rows: VisualRow[], top: number, e: ClientPointerEvent): Position {
+  const visual = rows[Math.max(0, Math.min(rows.length - 1, top + e.y))]
+  return { row: visual.row, col: colAtCell(visual, e.x - textStart(s.items[visual.row])) }
 }
 
 function fromProps(memo: MemoData, old: State | undefined): State {
@@ -264,7 +318,7 @@ function fromProps(memo: MemoData, old: State | undefined): State {
   const row = Math.min(old?.row ?? 0, items.length - 1)
   return {
     items, row, col: Math.min(old?.col ?? 0, charsOf(items[row].text).length),
-    version: memo.version, top: old?.top ?? 0, undo: [], lastEdit: '',
+    version: memo.version, top: old?.top ?? 0, undo: [], lastEdit: '', anchor: null, dragging: false,
   }
 }
 
@@ -276,10 +330,20 @@ const MemoEditor: ClientModule<MemoData, State> = (memo, surface) => {
   const columns = surface.columns || FALLBACK_COLUMNS
   const rowsShown = Math.max(1, (surface.rows || 12) - 1) // 맨 아래 한 줄은 되돌리기 단추
 
+  // 한 화면이 그려지기 전에 키가 여러 번 와도 빠지지 않게 최신 상태를 따로 든다.
+  let current = s
   const apply = (next: State) => {
-    if (next === s) return
+    if (next === current) return
+    const itemsChanged = next.items !== current.items
+    current = next
     surface.setState(next)
-    if (next.items !== s.items) surface.post({ lines: next.items.map(formatLine) })
+    if (itemsChanged) surface.post({ lines: next.items.map(formatLine) })
+  }
+
+  // Ctrl+C는 Claude Code가 먼저 가져가므로, 고르면 바로 복사한다.
+  const copySelection = () => {
+    const text = selectedText(current)
+    if (text) surface.post({ copy: text })
   }
 
   const rows = visibleRows(s.items).flatMap(row => {
@@ -292,14 +356,40 @@ const MemoEditor: ClientModule<MemoData, State> = (memo, surface) => {
   const top = Math.min(Math.max(s.top, cursorRow - rowsShown + 1), cursorRow)
   s.top = top
 
-  surface.onKey(e => apply(pressKey(s, e)))
+  surface.onKey(e => {
+    apply(pressKey(current, e))
+    if (e.shift) copySelection()
+  })
   surface.onPointer(e => {
-    if (e.type === 'down' && e.button === 'left') apply(pressPointer(s, rows, top, e))
+    if (e.type === 'down' && e.button === 'left') {
+      apply(pressPointer(current, rows, top, e))
+    } else if (e.type === 'move' && current.dragging) {
+      const anchor = current.anchor ?? { row: current.row, col: current.col }
+      apply({ ...current, ...positionAt(current, rows, top, e), anchor })
+    } else if (e.type === 'up' && current.dragging) {
+      apply({ ...current, dragging: false })
+      copySelection()
+    }
   })
 
   const drawText = (visual: VisualRow, index: number, item: Item) => {
     const isCursorRow = index === cursorRow
     const look = { dimColor: item.done, strikethrough: item.done }
+    const selection = selectionOf(s)
+    if (selection) {
+      const { start, end } = selection
+      if (visual.row < start.row || visual.row > end.row) return <Text {...look}>{visual.chars.join('')}</Text>
+      const clamp = (at: number) => Math.max(0, Math.min(visual.chars.length, at))
+      const from = visual.row === start.row ? clamp(start.col - visual.start) : 0
+      const to = visual.row === end.row ? clamp(end.col - visual.start) : visual.chars.length
+      return (
+        <Text>
+          <Text {...look}>{visual.chars.slice(0, from).join('')}</Text>
+          <Text backgroundColor={SELECT_BG}>{visual.chars.slice(from, to).join('')}</Text>
+          <Text {...look}>{visual.chars.slice(to).join('')}</Text>
+        </Text>
+      )
+    }
     if (!isCursorRow) return <Text {...look}>{visual.chars.join('')}</Text>
     const at = s.col - visual.start
     return (
@@ -333,15 +423,18 @@ const MemoEditor: ClientModule<MemoData, State> = (memo, surface) => {
             </Box>
             {showButtons && (
               <Box flexDirection="row" gap={1}>
-                <Button key="up" plain dimColor label="▲" onPress={() => apply(moveItem(s, s.row, -1))} />
-                <Button key="down" plain dimColor label="▼" onPress={() => apply(moveItem(s, s.row, 1))} />
-                <Button key="del" plain dimColor label="×" onPress={() => apply(removeItem(s, s.row))} />
+                <Button key="up" plain dimColor label="▲" onPress={() => apply(moveItem(current, current.row, -1))} />
+                <Button key="down" plain dimColor label="▼" onPress={() => apply(moveItem(current, current.row, 1))} />
+                <Button key="del" plain dimColor label="×" onPress={() => apply(removeItem(current, current.row))} />
               </Box>
             )}
           </Box>
         )
       })}
-      <Button key="undo" plain dimColor label="↶ 되돌리기" onPress={() => apply(undo(s))} />
+      <Box flexDirection="row" gap={2}>
+        <Button key="undo" plain dimColor label="↶ 되돌리기" onPress={() => apply(undo(current))} />
+        {selectionOf(s) && <Text dimColor>복사됨</Text>}
+      </Box>
     </Box>
   )
 }

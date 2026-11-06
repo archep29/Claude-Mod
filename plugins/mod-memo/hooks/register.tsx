@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderSurface } from 'claude-code'
 
 import type { MemoData } from '../types'
 
@@ -14,13 +14,15 @@ const OLD_MEMO_FILE = '.claude/plugins/mod-memo.txt' // .md가 없을 때만 읽
 const REFRESH_MS = 2_000
 // 탭은 연 순서대로 놓이고 순서를 정하는 기능이 없어, 세션목록이 열린 뒤에 열어 맨 뒤에 오게 한다.
 const OPEN_DELAY_MS = 1_000
-const HINT_ROWS = 5 // 편집기 아래 여백·안내문과 위 여백
+const COPY_DELAY_MS = 300 // 복사는 느려서, Shift+화살표를 누르는 동안은 기다렸다가 마지막 선택만 복사한다
+const HINT_ROWS = 6 // 편집기 아래 여백·안내문과 위 여백
 
 // null이면 파일을 못 읽은 것: 편집기를 내지 않아 빈 메모로 덮어쓰는 일을 막는다.
 const memoAtom = atom({ plugin: 'mod-memo', key: 'memo' } as const, null as MemoData | null)
 
 let knownText: string | null = null // 이 탭이 마지막으로 읽거나 쓴 파일 내용
 let queue: Promise<void> = Promise.resolve() // 읽기·쓰기가 뒤섞이지 않게 차례로
+let copyCount = 0 // 복사 요청 횟수. 더 새로운 요청이 왔는지 알아보는 데 쓴다.
 
 const inTurn = (work: () => Promise<void>) => (queue = queue.then(work))
 
@@ -75,6 +77,14 @@ const save = ($: EngineInterface, lines: string[]) =>
     }
   })
 
+async function copyWhenStopped($: EngineInterface, text: string, surface: RenderSurface) {
+  const mine = ++copyCount
+  await $.clock.sleep(COPY_DELAY_MS)
+  if (mine !== copyCount) return
+  const result = await $.ui.copy({ text, surface })
+  if (!result.isCopied) $.ui.toast('복사하지 못했습니다.')
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
@@ -98,7 +108,9 @@ export const register: Register = on => {
 
   on('ui.message', async ($, e, next) => {
     if (e.requestId !== PANE) return next(e)
-    await save($, (e.data as { lines: string[] }).lines)
+    const { lines, copy } = e.data as { lines?: string[]; copy?: string }
+    if (copy) void copyWhenStopped($, copy, e.surface)
+    if (lines) await save($, lines)
     return {}
   })
 
@@ -119,6 +131,7 @@ export const register: Register = on => {
           <Text dimColor>Enter 다음 · Tab 하위 · Shift+Tab 상위</Text>
           <Text dimColor>Ctrl+Z 되돌리기 · Ctrl+K 완료</Text>
           <Text dimColor>Ctrl+↑↓ 이동 · ▾ 누르면 접기</Text>
+          <Text dimColor>끌거나 Shift+←→로 고르면 복사</Text>
         </Box>
       </Box>
     )
