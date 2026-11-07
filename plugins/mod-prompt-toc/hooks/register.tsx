@@ -4,6 +4,8 @@ import type { EngineInterface, Register } from 'claude-code'
 const PANE = 'prompt-toc'
 const TITLE = '질문내역'
 const MARK_BG = '#5c5000' // 체크한 질문 배경(어두운 노랑)
+// 탭은 연 순서대로 놓여서, 세션목록이 열린 뒤에 연다(세션목록 → 질문내역 → 메모).
+const OPEN_DELAY_MS = 500
 
 // 체크한 질문들(질문 글 앞 200자로 구별). 세션마다 $.store에 남겨 창을 닫거나 다시 열어도 유지된다.
 const marksAtom = atom({ plugin: 'mod-prompt-toc', key: 'marks' } as const, [] as string[])
@@ -45,7 +47,6 @@ export const register: Register = on => {
     })
     const saved = (await $.store.get(await storeKey($))) as string[] | undefined
     if (saved) await update($, marksAtom, () => saved)
-    void $.ui.open({ id: PANE, title: TITLE })
     const savedIds = (await $.store.get(await idsKey($))) as [string, string][] | undefined
     for (const [id, text] of savedIds ?? []) if (!seen.has(id)) seen.set(id, text)
     savedCount = savedIds?.length ?? 0
@@ -57,7 +58,9 @@ export const register: Register = on => {
       }
       if (seen.size !== seenCount) $.ui.invalidate('ui.render')
     })
-    return next(e)
+    const started = await next(e)
+    $.clock.after(OPEN_DELAY_MS, () => void $.ui.open({ id: PANE, title: TITLE }))
+    return started
   })
 
   on('command.run', { command: 'mod-prompt-toc' }, async $ => {
