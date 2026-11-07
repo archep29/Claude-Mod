@@ -12,7 +12,7 @@ type Position = { row: number; col: number }
 // showCursor: 키보드가 메모에 있을 때만 켠다. promptEdits: 마지막으로 본 입력창 고친 횟수.
 type State = Snapshot & {
   version: number; top: number; undo: Snapshot[]; lastEdit: string; anchor: Position | null; dragging: boolean
-  showCursor: boolean; promptEdits: number
+  showCursor: boolean; promptEdits: number; clipId: number | undefined
 }
 type VisualRow = { row: number; start: number; chars: string[] }
 
@@ -242,6 +242,28 @@ function moveKey(s: State, key: string): State | undefined {
   }
 }
 
+// 여러 줄이면 줄마다 같은 단계의 불렛이 된다. 커서 뒤 글자는 마지막 줄 끝으로 간다.
+function pasteText(state: State, text: string): State {
+  const s = deleteSelection(state)
+  const lines = text.split('\n')
+  if (lines.length === 1) return typeText(s, text)
+  const item = s.items[s.row]
+  const chars = charsOf(item.text)
+  const added = lines.slice(1).map(line => ({ ...emptyItem(item.sub), text: line }))
+  const last = added.length - 1
+  const col = charsOf(added[last].text).length
+  added[last].text += chars.slice(s.col).join('')
+  const items = [
+    ...s.items.slice(0, s.row),
+    { ...item, text: chars.slice(0, s.col).join('') + lines[0] },
+    ...added,
+    ...s.items.slice(s.row + 1),
+  ]
+  return changed(s, items, s.row + added.length, col)
+}
+
+const isPasteKey = (e: ClientKeyEvent) => !e.ctrl && !e.meta && (e.key === 'V' || (e.key === 'v' && e.shift === true))
+
 function pressKey(s: State, e: ClientKeyEvent): State {
   if (e.ctrl) {
     if (e.key === 'z') return undo(s)
@@ -322,6 +344,7 @@ function fromProps(memo: EditorProps, old: State | undefined): State {
     items, row, col: Math.min(old?.col ?? 0, charsOf(items[row].text).length),
     version: memo.version, top: old?.top ?? 0, undo: [], lastEdit: '', anchor: null, dragging: false,
     showCursor: old?.showCursor ?? false, promptEdits: old?.promptEdits ?? memo.promptEdits,
+    clipId: old ? old.clipId : memo.clip?.id,
   }
 }
 
@@ -352,6 +375,16 @@ const MemoEditor: ClientModule<EditorProps, State> = (memo, surface) => {
     if (text) surface.post({ copy: text })
   }
 
+  // 클립보드를 읽어 달라고 하기 전에 상태를 남겨 둬야 돌아온 글을 새 글로 알아본다.
+  const requestPaste = () => {
+    apply({ ...current, showCursor: true })
+    surface.post({ paste: true })
+  }
+
+  if (memo.clip && memo.clip.id !== current.clipId) {
+    apply({ ...pasteText(current, memo.clip.text), clipId: memo.clip.id, showCursor: true })
+  }
+
   const rows = visibleRows(s.items).flatMap(row => {
     const cells = Math.max(4, columns - textStart(s.items[row]) - BUTTON_CELLS)
     return wrapItem(s.items[row], row, cells)
@@ -363,11 +396,17 @@ const MemoEditor: ClientModule<EditorProps, State> = (memo, surface) => {
   s.top = top
 
   surface.onKey(e => {
+    if (isPasteKey(e)) {
+      requestPaste()
+      return
+    }
     apply({ ...pressKey(current, e), showCursor: true })
     if (e.shift) copySelection()
   })
   surface.onPointer(e => {
-    if (e.type === 'down' && e.button === 'left') {
+    if (e.type === 'down' && e.button === 'right') {
+      requestPaste()
+    } else if (e.type === 'down' && e.button === 'left') {
       apply({ ...pressPointer(current, rows, top, e), showCursor: true })
     } else if (e.type === 'move' && current.dragging) {
       const anchor = current.anchor ?? { row: current.row, col: current.col }
@@ -441,6 +480,7 @@ const MemoEditor: ClientModule<EditorProps, State> = (memo, surface) => {
       })}
       <Box flexDirection="row" gap={2} marginTop={1}>
         <Button key="undo" plain dimColor label="↶ 되돌리기" onPress={() => apply(undo(current))} />
+        <Button key="paste" plain dimColor label="붙여넣기" onPress={requestPaste} />
         {selectionOf(s) && <Text dimColor>복사됨</Text>}
       </Box>
     </Box>
