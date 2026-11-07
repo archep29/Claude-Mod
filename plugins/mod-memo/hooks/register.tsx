@@ -157,7 +157,7 @@ export const register: Register = on => {
           <Text dimColor>Ctrl+Z 되돌리기 · Ctrl+K 완료</Text>
           <Text dimColor>Ctrl+↑↓ 이동 · ▾ 누르면 접기</Text>
           <Text dimColor>끌거나 Shift+←→로 고르면 복사</Text>
-          <Text dimColor>Shift+V·오른쪽 클릭 붙여넣기</Text>
+          <Text dimColor>오른쪽 클릭·단추로 붙여넣기</Text>
         </Box>
       </Box>
     )

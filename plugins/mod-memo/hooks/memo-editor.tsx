@@ -262,8 +262,6 @@ function pasteText(state: State, text: string): State {
   return changed(s, items, s.row + added.length, col)
 }
 
-const isPasteKey = (e: ClientKeyEvent) => !e.ctrl && !e.meta && (e.key === 'V' || (e.key === 'v' && e.shift === true))
-
 function pressKey(s: State, e: ClientKeyEvent): State {
   if (e.ctrl) {
     if (e.key === 'z') return undo(s)
@@ -396,10 +394,6 @@ const MemoEditor: ClientModule<EditorProps, State> = (memo, surface) => {
   s.top = top
 
   surface.onKey(e => {
-    if (isPasteKey(e)) {
-      requestPaste()
-      return
-    }
     apply({ ...pressKey(current, e), showCursor: true })
     if (e.shift) copySelection()
   })
