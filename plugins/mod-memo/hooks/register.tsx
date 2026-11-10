@@ -12,7 +12,7 @@ const TITLE = '메모'
 const MEMO_FILE = '.claude/plugins/mod-memo.md'
 const OLD_MEMO_FILE = '.claude/plugins/mod-memo.txt' // .md가 없을 때만 읽는다
 const REFRESH_MS = 2_000
-// 탭은 연 순서대로 놓이고 순서를 정하는 기능이 없어, 질문내역이 열린 뒤에 열어 맨 뒤에 오게 한다.
+// 탭은 연 순서대로 놓이고 순서를 정하는 기능이 없어, 대화내역이 열린 뒤에 열어 맨 뒤에 오게 한다.
 const OPEN_DELAY_MS = 1_000
 const COPY_DELAY_MS = 300 // 복사는 느려서, Shift+화살표를 누르는 동안은 기다렸다가 마지막 선택만 복사한다
 const CLIP_LIMIT = 50_000 // 편집기로 넘길 수 있는 글자 수에 여유를 둔 값

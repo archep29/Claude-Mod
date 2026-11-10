@@ -2,9 +2,9 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 const PANE = 'prompt-toc'
-const TITLE = '질문내역'
+const TITLE = '대화내역'
 const MARK_BG = '#5c5000' // 체크한 질문 배경(어두운 노랑)
-// 탭은 연 순서대로 놓여서, 세션목록이 열린 뒤에 연다(세션목록 → 질문내역 → 메모).
+// 탭은 연 순서대로 놓여서, 세션목록이 열린 뒤에 연다(세션목록 → 대화내역 → 메모).
 const OPEN_DELAY_MS = 500
 
 // 체크한 질문들(질문 글 앞 200자로 구별). 세션마다 $.store에 남겨 창을 닫거나 다시 열어도 유지된다.
@@ -39,16 +39,27 @@ const circled = (n: number) =>
 const cleanStored = (text: string) =>
   squash(text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, ''))
 
+// 엔진이 사용자 글 자리에 넣는 것(스킬 본문, 다른 세션의 메시지, 그림 정보, 이어하기 요약). 질문이 아니라 뺀다.
+const ENGINE_TEXTS = [
+  'Base directory for this skill:',
+  'Another Claude session sent a message',
+  '[Image: ',
+  'This session is being continued from a previous',
+]
+
+// 질문이 저장되기 전 잠깐 그려지는 줄의 임시 id. 이 id로는 이동할 수 없다.
+const PLACEHOLDER_ID = 'placeholder'
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'mod-prompt-toc',
-      description: '[mod] 내가 적은 질문내역 창 열기',
+      description: '[mod] 내가 적은 대화내역 창 열기',
     })
     const saved = (await $.store.get(await storeKey($))) as string[] | undefined
     if (saved) await update($, marksAtom, () => saved)
     const savedIds = (await $.store.get(await idsKey($))) as [string, string][] | undefined
-    for (const [id, text] of savedIds ?? []) if (!seen.has(id)) seen.set(id, text)
+    for (const [id, text] of savedIds ?? []) if (id !== PLACEHOLDER_ID && !seen.has(id)) seen.set(id, text)
     savedCount = savedIds?.length ?? 0
     // 새로 기억한 질문 줄이 있으면 저장소에 적고 창을 다시 그린다
     $.clock.every(1000, async () => {
@@ -67,10 +78,10 @@ export const register: Register = on => {
     // 열려 있으면 닫고, 닫혀 있으면 연다.
     if ((await $.ui.panes()).some(pane => pane.id === PANE)) {
       await $.ui.close({ id: PANE })
-      return { text: '질문내역 창을 닫았습니다.' }
+      return { text: '대화내역 창을 닫았습니다.' }
     }
     await $.ui.open({ id: PANE, title: TITLE })
-    return { text: '질문내역 창을 열었습니다.' }
+    return { text: '대화내역 창을 열었습니다.' }
   })
 
   // 사용자 글이 대화 기록에 들어간 직후 목차를 다시 그린다.
@@ -85,7 +96,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
     const kind = e.props.origin.kind
     const text = squash(e.props.text)
-    if ((kind === 'composer' || kind === 'bridge') && text !== '') {
+    if ((kind === 'composer' || kind === 'bridge') && text !== '' && e.requestId !== PLACEHOLDER_ID) {
       seen.set(e.requestId, text)
     }
     return next(e)
@@ -96,25 +107,26 @@ export const register: Register = on => {
     seenCount = seen.size
     const marks = await read($, marksAtom)
 
-    // 순서는 대화 기록을 따른다. 시스템 글(<...>로 시작), 중단 알림([Request interrupted...]), 도구 결과는 뺀다.
+    // 순서는 대화 기록을 따른다. 시스템 글(<...>로 시작), 중단 알림([Request interrupted...]), 엔진이 넣은 글, 도구 결과는 뺀다.
     const stored = (await $.session.messages())
       .filter(m => m.role === 'user' && !m.toolResults?.length)
       .map(m => cleanStored(m.text))
       .filter(text => text !== '' && !text.startsWith('<') && !text.startsWith('[Request interrupted'))
+      .filter(text => !ENGINE_TEXTS.some(head => text.startsWith(head)))
 
-    // 각 질문에 화면 줄 id를 앞에서부터 하나씩 짝짓는다
+    // 각 질문에 화면 줄 id를 짝짓는다. 글이 똑같은 줄을 먼저 다 짝짓고, 남은 질문은 앞 60자가 같은 줄과 짝짓는다.
+    // 글 속에 들어 있기만 해도 짝지으면 「해줘」 같은 짧은 질문의 줄을 긴 질문이 가져가 버렸다.
     const used = new Set<string>()
-    const items = stored.map(text => {
-      let id: string | undefined
-      for (const [rowId, rowText] of seen) {
-        if (!used.has(rowId) && text.includes(rowText.slice(0, 60))) {
-          id = rowId
-          break
-        }
-      }
-      if (id) used.add(id)
-      return { text, id }
-    })
+    const pick = (match: (rowText: string) => boolean) => {
+      const row = [...seen].find(([rowId, rowText]) => !used.has(rowId) && match(rowText))
+      if (row) used.add(row[0])
+      return row?.[0]
+    }
+    const exactIds = stored.map(text => pick(rowText => rowText === text))
+    const items = stored.map((text, i) => ({
+      text,
+      id: exactIds[i] ?? pick(rowText => text.startsWith(rowText.slice(0, 60))),
+    }))
 
     if (items.length === 0) {
       return <Text dimColor>아직 적은 질문이 없습니다.</Text>

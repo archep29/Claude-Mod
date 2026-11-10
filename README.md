@@ -25,9 +25,9 @@ Claude Code 터미널에 붙여 쓰는 모드 2개입니다.
 
 ![최소화했을 때 예시](docs/session-list-minimized.png)
 
-### 질문내역 (`mod-prompt-toc`)
+### 대화내역 (`mod-prompt-toc`)
 
-![질문내역 예시](docs/prompt-toc.png)
+![대화내역 예시](docs/prompt-toc.png)
 
 ### 메모 (`mod-memo`)
 
@@ -87,7 +87,7 @@ claude plugin install mod-memo --marketplace archep29/Claude-Mod
 | 모드 | 켜기 | 끄기 |
 |---|---|---|
 | 세션목록 | `/mod-session-list` | `/mod-session-list` 한 번 더, 또는 「_ 최소화」 |
-| 질문내역 | `/mod-prompt-toc` | `/mod-prompt-toc` 한 번 더, 또는 패널 오른쪽 위 `×` |
+| 대화내역 | `/mod-prompt-toc` | `/mod-prompt-toc` 한 번 더, 또는 패널 오른쪽 위 `×` |
 | 메모 | `/mod-memo` | `/mod-memo` 한 번 더, 또는 패널 오른쪽 위 `×` |
 
 - 세션목록을 「_ 최소화」로 접으면 입력창 위 「▸ 세션목록」 한 줄만 남고, 그 줄을 누르면 다시 열립니다.
