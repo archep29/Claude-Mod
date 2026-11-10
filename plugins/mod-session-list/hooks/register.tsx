@@ -271,17 +271,16 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column" marginTop={1}>
-        <Box flexDirection="row" gap={2}>
+        {/* 한 줄에 다 놓고, 칸이 모자라면 넘친 단추만 통째로 다음 줄로 내린다 */}
+        <Box flexDirection="row" flexWrap="wrap" columnGap={2} marginBottom={1}>
           <Text dimColor>{scan.sessions.length}개</Text>
           <Button key="refresh" plain dimColor label={loading ? '읽는 중' : '↻ 새로고침'} onPress={() => void refresh($)} />
           <Button key="sort-mode" plain dimColor label={prefs.sortMode === 'date' ? '⇅ 날짜순' : '⇅ 내 순서'} onPress={() => void toggleSort()} />
-          <Button key="minimize" plain dimColor label="_ 최소화" onPress={() => void minimize($)} />
-        </Box>
-        {/* 윗줄은 꽉 차서, 그 아래 빈 줄에 둔다. 펼친 폴더가 있을 때만 보인다. */}
-        <Box height={1}>
+          {/* 펼친 폴더가 있을 때만 보인다 */}
           {projects.some(p => prefs.expanded.includes(p.key)) && (
             <Button key="collapse-all" plain dimColor label="▸ 다 닫기" onPress={() => void collapseAll()} />
           )}
+          <Button key="minimize" plain dimColor label="_ 최소화" onPress={() => void minimize($)} />
         </Box>
         {projects.map(project => {
           const isOpen = prefs.expanded.includes(project.key)
