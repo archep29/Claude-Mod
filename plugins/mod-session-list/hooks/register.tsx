@@ -278,7 +278,7 @@ export const register: Register = on => {
           <Button key="sort-mode" plain dimColor label={prefs.sortMode === 'date' ? '⇅ 날짜순' : '⇅ 내 순서'} onPress={() => void toggleSort()} />
           {/* 펼친 폴더가 있을 때만 보인다 */}
           {projects.some(p => prefs.expanded.includes(p.key)) && (
-            <Button key="collapse-all" plain dimColor label="▸ 다 닫기" onPress={() => void collapseAll()} />
+            <Button key="collapse-all" plain dimColor label="▸ 축소" onPress={() => void collapseAll()} />
           )}
           <Button key="minimize" plain dimColor label="_ 최소화" onPress={() => void minimize($)} />
         </Box>
