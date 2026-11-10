@@ -90,6 +90,7 @@ claude plugin install mod-memo --marketplace archep29/Claude-Mod
 | 대화내역 | `/mod-prompt-toc` | `/mod-prompt-toc` 한 번 더, 또는 패널 오른쪽 위 `×` |
 | 메모 | `/mod-memo` | `/mod-memo` 한 번 더, 또는 패널 오른쪽 위 `×` |
 
+- 세션목록 맨 위 「▸ 다 닫기」를 누르면 펼친 폴더가 한 번에 모두 접힙니다(펼친 폴더가 있을 때만 보임).
 - 세션목록을 「_ 최소화」로 접으면 입력창 위 「▸ 세션목록」 한 줄만 남고, 그 줄을 누르면 다시 열립니다.
 - 모드 자체를 아예 쓰지 않으려면 `/plugin`에서 끄거나 지웁니다.
 

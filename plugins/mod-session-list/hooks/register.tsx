@@ -247,6 +247,8 @@ export const register: Register = on => {
         expanded: p.expanded.includes(key) ? p.expanded.filter(k => k !== key) : [...p.expanded, key],
       }))
 
+    const collapseAll = () => savePrefs($, p => ({ ...p, expanded: [] }))
+
     const moveProject = (key: string, step: number) =>
       savePrefs($, p => ({ ...p, sortMode: 'manual', projectOrder: moved(projectKeys, key, step) }))
 
@@ -269,11 +271,17 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column" marginTop={1}>
-        <Box flexDirection="row" gap={2} marginBottom={1}>
+        <Box flexDirection="row" gap={2}>
           <Text dimColor>{scan.sessions.length}개</Text>
           <Button key="refresh" plain dimColor label={loading ? '읽는 중' : '↻ 새로고침'} onPress={() => void refresh($)} />
           <Button key="sort-mode" plain dimColor label={prefs.sortMode === 'date' ? '⇅ 날짜순' : '⇅ 내 순서'} onPress={() => void toggleSort()} />
           <Button key="minimize" plain dimColor label="_ 최소화" onPress={() => void minimize($)} />
+        </Box>
+        {/* 윗줄은 꽉 차서, 그 아래 빈 줄에 둔다. 펼친 폴더가 있을 때만 보인다. */}
+        <Box height={1}>
+          {projects.some(p => prefs.expanded.includes(p.key)) && (
+            <Button key="collapse-all" plain dimColor label="▸ 다 닫기" onPress={() => void collapseAll()} />
+          )}
         </Box>
         {projects.map(project => {
           const isOpen = prefs.expanded.includes(project.key)
