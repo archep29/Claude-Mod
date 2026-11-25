@@ -12,8 +12,8 @@ const TITLE = '메모'
 const MEMO_FILE = '.claude/plugins/mod-memo.md'
 const OLD_MEMO_FILE = '.claude/plugins/mod-memo.txt' // .md가 없을 때만 읽는다
 const REFRESH_MS = 2_000
-// 탭은 연 순서대로 놓이고 순서를 정하는 기능이 없어, 대화내역이 열린 뒤에 열어 맨 뒤에 오게 한다.
-const OPEN_DELAY_MS = 1_000
+// 탭은 연 순서대로 놓이고 순서를 정하는 기능이 없어, 대화내역(0.3초)·세션목록(1.3초)이 열린 뒤에 열어 맨 뒤에 오게 한다.
+const OPEN_DELAY_MS = 2_300
 const COPY_DELAY_MS = 300 // 복사는 느려서, Shift+화살표를 누르는 동안은 기다렸다가 마지막 선택만 복사한다
 const CLIP_LIMIT = 50_000 // 편집기로 넘길 수 있는 글자 수에 여유를 둔 값
 const HINT_ROWS = 7 // 편집기 아래 여백·안내문과 위 여백
@@ -104,9 +104,10 @@ async function pasteClipboard($: EngineInterface) {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
+    // 파일 읽기가 늦어도 여는 때가 밀리지 않게 시계를 먼저 건다.
+    $.clock.after(OPEN_DELAY_MS, () => void $.ui.open({ id: PANE, title: TITLE }))
     await $.command.register({ name: 'mod-memo', description: '[mod] 메모 탭 열기' })
     await refresh($)
-    $.clock.after(OPEN_DELAY_MS, () => void $.ui.open({ id: PANE, title: TITLE }))
     $.clock.every(REFRESH_MS, () => void refresh($))
     return started
   })

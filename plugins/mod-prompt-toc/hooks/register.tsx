@@ -4,8 +4,13 @@ import type { EngineInterface, Register } from 'claude-code'
 const PANE = 'prompt-toc'
 const TITLE = '대화내역'
 const MARK_BG = '#5c5000' // 체크한 질문 배경(어두운 노랑)
-// 탭은 연 순서대로 놓여서, 세션목록이 열린 뒤에 연다(세션목록 → 대화내역 → 메모).
-const OPEN_DELAY_MS = 500
+// 탭은 연 순서대로 놓여서, 대화내역 → 세션목록 → 메모 순서로 1초씩 띄워 연다(세션목록·메모의 OPEN_DELAY_MS와 맞춤).
+const OPEN_DELAY_MS = 300
+// 마지막에 연 탭이 앞에 보여서, 메모(2.3초)까지 열린 뒤 대화내역을 앞으로 올린다.
+// 입력창에 글이 있으면 엔진이 거절하므로, 올라올 때까지 1초마다 다시 해 본다.
+const RAISE_DELAY_MS = 3_000
+const RAISE_RETRY_MS = 1_000
+const RAISE_TRIES = 30
 
 // 체크한 질문들(질문 글 앞 200자로 구별). 세션마다 $.store에 남겨 창을 닫거나 다시 열어도 유지된다.
 const marksAtom = atom({ plugin: 'mod-prompt-toc', key: 'marks' } as const, [] as string[])
@@ -50,6 +55,14 @@ const ENGINE_TEXTS = [
 // 질문이 저장되기 전 잠깐 그려지는 줄의 임시 id. 이 id로는 이동할 수 없다.
 const PLACEHOLDER_ID = 'placeholder'
 
+// 탭을 앞으로 올리는 방법은 focus뿐이다. 글자를 치면 키보드는 입력창으로 돌아간다.
+async function raise($: EngineInterface, tries: number) {
+  const pane = (await $.ui.panes()).find(p => p.id === PANE)
+  if (!pane || pane.isShown || tries === 0) return
+  await $.ui.open({ id: PANE, title: TITLE, focus: true })
+  $.clock.after(RAISE_RETRY_MS, () => void raise($, tries - 1))
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -71,6 +84,7 @@ export const register: Register = on => {
     })
     const started = await next(e)
     $.clock.after(OPEN_DELAY_MS, () => void $.ui.open({ id: PANE, title: TITLE }))
+    $.clock.after(RAISE_DELAY_MS, () => void raise($, RAISE_TRIES))
     return started
   })
 

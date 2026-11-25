@@ -9,6 +9,8 @@ import type { Prefs, ScanResult, SessionRow } from '../types'
 
 const PANE = 'session-list'
 const TITLE = '세션목록'
+// 탭은 연 순서대로 놓여서, 대화내역(0.3초) 뒤·메모(2.3초) 앞에 연다.
+const OPEN_DELAY_MS = 1_300
 const PREFS_KEY = 'prefs' // 예전 $.store 자리. 파일이 없을 때 한 번 옮겨 오는 데만 쓴다.
 // 두 계정이 같이 쓰고, .claude 동기화로 다른 PC에도 간다.
 const PREFS_FILE = '.claude/plugins/mod-session-list-prefs.json'
@@ -167,8 +169,17 @@ async function refresh($: EngineInterface) {
 
 // 크기는 처음 요청일 뿐이고, 테두리를 끌어 바꾼 크기가 있으면 엔진이 그쪽을 쓴다.
 async function openPane($: EngineInterface) {
+  // 먼저 연다: 저장을 기다리다 늦게 열리면 탭 순서가 밀린다.
+  const opened = $.ui.open({ id: PANE, title: TITLE, columns: 48, rows: 16 })
   await savePrefs($, p => ({ ...p, minimized: false }))
-  return $.ui.open({ id: PANE, title: TITLE, columns: 48, rows: 16 })
+  return opened
+}
+
+// 저장해 둔 순서·펼침을 불러온다. 처음 쓸 때는 지금 작업 폴더만 펼쳐 둔다.
+async function loadStartPrefs($: EngineInterface) {
+  const saved = (await loadPrefs($)) ?? ((await $.store.get(PREFS_KEY)) as Prefs | undefined)
+  const first = { ...EMPTY_PREFS, expanded: [projectKey(await $.session.cwd())] }
+  await update($, prefsAtom, () => (saved ? { ...EMPTY_PREFS, ...saved } : first))
 }
 
 async function minimize($: EngineInterface) {
@@ -179,13 +190,15 @@ async function minimize($: EngineInterface) {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
+    // 불러오기가 늦어도 여는 때가 밀리지 않게 시계를 먼저 건다.
+    const ready = loadStartPrefs($)
+    $.clock.after(OPEN_DELAY_MS, async () => {
+      await ready
+      if (!(await read($, prefsAtom)).minimized) void openPane($)
+    })
     await $.command.register({ name: 'mod-session-list', description: '[mod] 세션목록 패널 열기' })
-    const saved = (await loadPrefs($)) ?? ((await $.store.get(PREFS_KEY)) as Prefs | undefined)
-    // 처음 쓸 때는 지금 작업 폴더만 펼쳐 둔다.
-    const first = { ...EMPTY_PREFS, expanded: [projectKey(await $.session.cwd())] }
-    await update($, prefsAtom, () => (saved ? { ...EMPTY_PREFS, ...saved } : first))
+    await ready
     void refresh($)
-    if (!(await read($, prefsAtom)).minimized) void openPane($)
     // 다른 탭에서 세션을 켜고 끈 것도 보이도록 1분마다 다시 읽는다.
     $.clock.every(60_000, () => void refresh($))
     return started
